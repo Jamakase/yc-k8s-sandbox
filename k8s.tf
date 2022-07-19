@@ -1,5 +1,6 @@
 locals {
   version = "1.21"
+  cluster_access_net_addr = "0.0.0.0/0"
 }
 
 resource "yandex_kubernetes_cluster" "test-cluster" {
@@ -30,11 +31,12 @@ resource "yandex_kubernetes_cluster" "test-cluster" {
 
 resource "yandex_kubernetes_node_group" "cluster_node_group" {
   cluster_id = yandex_kubernetes_cluster.test-cluster.id
+  name = "system"
 
   version = local.version
 
   instance_template {
-    platform_id = "standard-v1"
+    platform_id = "standard-v3"
 
     network_interface {
       nat                = true
@@ -71,8 +73,55 @@ resource "yandex_kubernetes_node_group" "cluster_node_group" {
       zone = yandex_vpc_subnet.cluster_subnet.zone
     }
   }
-
 }
+
+resource "yandex_kubernetes_node_group" "cluster_apps_node_group" {
+  cluster_id = yandex_kubernetes_cluster.test-cluster.id
+  name = "apps"
+
+  version = local.version
+
+  instance_template {
+    platform_id = "standard-v3"
+
+    network_interface {
+      nat                = true
+      subnet_ids         = [yandex_vpc_subnet.cluster_subnet.id]
+      security_group_ids = [
+        yandex_vpc_security_group.k8s-main-sg.id,
+        #        yandex_vpc_security_group.k8s-nodes-ssh-access.id,
+        #        yandex_vpc_security_group.k8s-public-services.id
+      ]
+    }
+
+    resources {
+      memory = 2
+      cores  = 2
+      core_fraction = 20
+    }
+
+    boot_disk {
+      type = "network-hdd"
+      size = 64
+    }
+
+    scheduling_policy {
+      preemptible = true
+    }
+  }
+  scale_policy {
+    fixed_scale {
+      size = 1
+    }
+  }
+
+  allocation_policy {
+    location {
+      zone = yandex_vpc_subnet.cluster_subnet.zone
+    }
+  }
+}
+
 
 resource "yandex_vpc_security_group" "k8s-main-sg" {
   name        = "k8s-main-sg"
@@ -121,14 +170,14 @@ resource "yandex_vpc_security_group" "k8s-master-whitelist" {
   ingress {
     protocol       = "TCP"
     description    = "Правило разрешает подключение к API Kubernetes через порт 6443 из указанной сети."
-    v4_cidr_blocks = ["0.0.0.0/0"]
+    v4_cidr_blocks = [local.cluster_access_net_addr]
     port           = 6443
   }
 
   ingress {
     protocol       = "TCP"
     description    = "Правило разрешает подключение к API Kubernetes через порт 443 из указанной сети."
-    v4_cidr_blocks = ["0.0.0.0/0"]
+    v4_cidr_blocks = [local.cluster_access_net_addr]
     port           = 443
   }
 }

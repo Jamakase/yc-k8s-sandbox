@@ -109,3 +109,5 @@ terraform.rc
 
 /yc-infra-test.iml
 /.idea/
+
+key.json
