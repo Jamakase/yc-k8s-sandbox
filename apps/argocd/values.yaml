@@ -1,2 +1,10 @@
 argo-cd:
-  nameOverride:
+  server:
+    ingress:
+      enabled: true
+      annotations:
+        kubernetes.io/ingress.class: nginx
+      hosts:
+        - ewolke.io
+      pathType: "Exact"
+#      ingressClassName: nginx
